@@ -137,6 +137,7 @@ class BaseAgent:
             config = types.GenerateContentConfig(
                 system_instruction=self.system_prompt,
                 temperature=0.2,  # Lower temperature for more focused exploration
+                max_output_tokens=8192,  # Ensure complete responses
                 tools=self.tools if self.tools else None
             )
             
@@ -164,7 +165,17 @@ class BaseAgent:
                 has_function_call = False
                 if hasattr(response, 'candidates') and response.candidates:
                     candidate = response.candidates[0]
-                    if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                    
+                    # Check if content is None (blocked by safety filters)
+                    if not hasattr(candidate, 'content') or candidate.content is None:
+                        log.error('❌ API response blocked (content is None) - likely safety filter or rate limit')
+                        if hasattr(candidate, 'finish_reason'):
+                            log.error(f'   Finish reason: {candidate.finish_reason}')
+                        if hasattr(candidate, 'safety_ratings'):
+                            log.error(f'   Safety ratings: {candidate.safety_ratings}')
+                        raise ValueError('API response was blocked. This may be due to safety filters or rate limiting.')
+                    
+                    if hasattr(candidate.content, 'parts') and candidate.content.parts:
                         for part in candidate.content.parts:
                             if hasattr(part, 'function_call'):
                                 has_function_call = True
@@ -208,7 +219,7 @@ class BaseAgent:
                     # Try to get partial text
                     if hasattr(response, 'candidates') and response.candidates:
                         candidate = response.candidates[0]
-                        if hasattr(candidate, 'content'):
+                        if hasattr(candidate, 'content') and candidate.content is not None and hasattr(candidate.content, 'parts'):
                             for part in candidate.content.parts:
                                 if hasattr(part, 'text') and part.text:
                                     log.info(f'Found partial text: {part.text[:200]}')

@@ -22,7 +22,7 @@ if api_key:
 else:
     client = None
 
-VIDEO_SYSTEM_PROMPT = """You are an expert video content creator. Your job is to transform documentation into engaging 7-10 slide video storyboards for employee training.
+VIDEO_SYSTEM_PROMPT = """You are an expert video content creator. Your job is to transform documentation into concise 4-5 slide video storyboards for employee training.
 
 ## OUTPUT FORMAT
 You MUST output valid JSON with this exact structure:
@@ -32,25 +32,23 @@ You MUST output valid JSON with this exact structure:
       "title": "Slide title (short, catchy)",
       "bullets": ["Point 1", "Point 2", "Point 3"],
       "imagePrompt": "Detailed description for AI image generation - describe a professional diagram or visualization",
-      "voiceover": "30-60 second narration script. Conversational, clear, engaging."
+      "voiceover": "20-40 second narration script. Conversational, clear, engaging."
     }
   ]
 }
 
-## SLIDE STRUCTURE (10 slides recommended)
-1. **Opening** - Hook the viewer, introduce the topic, what they'll learn
-2-3. **Context** - Set the scene, explain why this matters to users
-4-7. **Main Content** - Core information, features, how things work
-8-9. **Practical Tips** - How to help users, common scenarios
-10. **Closing** - Summary, key takeaways, next steps
+## SLIDE STRUCTURE (4-5 slides MAXIMUM)
+1. **Opening** - Hook + introduce topic (30-40 seconds)
+2-3. **Main Content** - Core 2-3 key points (30-40 seconds each)
+4. **Closing** - Summary + takeaways (20-30 seconds)
 
 ## RULES
-- Create exactly 7-10 slides (prefer 10 for comprehensive topics)
-- Each voiceover should be 30-60 seconds when read aloud (~75-150 words)
-- Write voiceovers as if speaking to a colleague - conversational and clear
-- Keep titles short (3-6 words maximum)
-- Include 2-4 bullet points per slide
-- Total video should be 5-8 minutes
+- Create EXACTLY 4-5 slides maximum (no more!)
+- Each voiceover should be 20-40 seconds when read aloud (~50-100 words)
+- Write voiceovers as conversational - as if speaking to a colleague
+- Keep titles short (3-5 words maximum)
+- Include 2-3 bullet points per slide (keep brief!)
+- Total video should be 2-3 minutes maximum
 
 ## IMAGE PROMPT GUIDELINES
 - Describe professional diagrams, charts, or illustrations
@@ -87,7 +85,9 @@ def generate_storyboard(document_title: str, document_content: str) -> Dict[str,
 **Content:**
 {document_content[:8000]}  # Limit content to avoid token limits
 
-Create a compelling 7-10 slide video that will help employees understand this topic. Focus on what's actionable and relevant to supporting users.
+Create a compelling 4-5 slide video that will help employees understand this topic. Keep it concise and focused on key points only.
+
+**IMPORTANT**: Generate EXACTLY 4-5 slides maximum (1 title + 3-4 content/summary slides). Keep each slide brief.
 
 Output the storyboard as valid JSON following the format specified in your instructions."""
 

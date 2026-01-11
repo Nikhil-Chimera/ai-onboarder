@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from lib.database import init_db
 from pages import home
+from lib.ui.styles import get_custom_css
 
 # Page configuration
 st.set_page_config(
@@ -22,6 +23,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# Apply custom CSS
+st.markdown(get_custom_css(), unsafe_allow_html=True)
 
 # Initialize database
 init_db()

@@ -77,11 +77,27 @@ For EVERY claim, provide:
 class QAAgent(BaseAgent):
     """Agent for answering questions about the codebase"""
     
-    def __init__(self, repo_tools: RepoTools, project_md: str):
+    def __init__(self, repo_tools: RepoTools, project_md: str, context_only: bool = False):
         self.project_md = project_md
+        self.context_only = context_only
         
         # Enhance system prompt with project context
-        enhanced_prompt = f"""{QA_SYSTEM}
+        if context_only:
+            enhanced_prompt = f"""You are an expert code analyst. Answer questions based ONLY on the PROJECT.md context provided below.
+
+## Project Context
+
+Here is the PROJECT.md summary for this repository:
+
+{project_md}
+
+## Instructions
+- Answer questions based on the PROJECT.md content above
+- Be specific and detailed using the information available
+- If the answer is not in PROJECT.md, say so clearly
+- Do not make assumptions beyond what's documented"""
+        else:
+            enhanced_prompt = f"""{QA_SYSTEM}
 
 ## Project Context
 

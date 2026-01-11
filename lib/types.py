@@ -40,6 +40,8 @@ class Document:
     content: str
     diagram_url: Optional[str]
     created_at: str
+    status: str = 'pending'  # pending, generating, ready, error
+    error_message: Optional[str] = None
 
 @dataclass
 class Video:

@@ -70,26 +70,70 @@ def process_repository_async(project_id: str, github_url: str):
         update_project_status(project_id, 'error', str(e))
 
 def render(navigate_to):
-    """Render home page"""
+    """Render home page with clean UI"""
     
-    st.title('🧠 AI-Onboarder')
-    st.markdown('### Transform GitHub repositories into comprehensive onboarding documentation')
+    # Hero Section
+    st.markdown("""
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; 
+                padding: 40px; margin-bottom: 32px; text-align: center;">
+        <h1 style="color: #0f172a; font-size: 42px; margin: 0 0 8px 0;">📋 AI-Onboarder</h1>
+        <p style="color: #64748b; font-size: 16px; margin: 0 0 16px 0;"><strong>by Hello World Programmers</strong></p>
+        <p style="font-size: 18px; color: #64748b; margin: 0;">
+            Transform GitHub repositories into comprehensive onboarding documentation
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Features Section
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("""
+        <div style="background: white; border: 1px solid #cbd5e1; border-radius: 12px; 
+                    padding: 28px; text-align: center; height: 220px; display: flex; flex-direction: column; justify-content: center;">
+            <div style="font-size: 48px; margin-bottom: 16px;">📚</div>
+            <h3 style="color: #0f172a; margin: 0 0 12px 0; font-size: 20px; font-weight: 600;">Documentation</h3>
+            <p style="color: #64748b; margin: 0; font-size: 14px; line-height: 1.6;">Generate comprehensive documentation from your codebase automatically</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("""
+        <div style="background: white; border: 1px solid #cbd5e1; border-radius: 12px; 
+                    padding: 28px; text-align: center; height: 220px; display: flex; flex-direction: column; justify-content: center;">
+            <div style="font-size: 48px; margin-bottom: 16px;">🎬</div>
+            <h3 style="color: #0f172a; margin: 0 0 12px 0; font-size: 20px; font-weight: 600;">Video Briefings</h3>
+            <p style="color: #64748b; margin: 0; font-size: 14px; line-height: 1.6;">Create engaging video explanations with AI-powered narration</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown("""
+        <div style="background: white; border: 1px solid #cbd5e1; border-radius: 12px; 
+                    padding: 28px; text-align: center; height: 220px; display: flex; flex-direction: column; justify-content: center;">
+            <div style="font-size: 48px; margin-bottom: 16px;">💬</div>
+            <h3 style="color: #0f172a; margin: 0 0 12px 0; font-size: 20px; font-weight: 600;">Interactive Chat</h3>
+            <p style="color: #64748b; margin: 0; font-size: 14px; line-height: 1.6;">Ask questions about your code and get instant answers</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
     
     # Repository input section
-    st.markdown('---')
-    st.subheader('Add Repository')
+    st.markdown("### 🚀 Add New Repository")
     
-    col1, col2 = st.columns([3, 1])
+    col1, col2 = st.columns([4, 1])
     
     with col1:
         github_url = st.text_input(
             'GitHub URL',
             placeholder='https://github.com/owner/repo',
-            label_visibility='collapsed'
+            label_visibility='collapsed',
+            help='Enter the full GitHub repository URL'
         )
     
     with col2:
-        submit_button = st.button('Analyze Repository', type='primary', use_container_width=True)
+        submit_button = st.button('Analyze', type='primary', use_container_width=True)
     
     # Handle submission
     if submit_button:
@@ -128,13 +172,20 @@ def render(navigate_to):
                 st.rerun()
     
     # Projects list
-    st.markdown('---')
-    st.subheader('Your Projects')
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("### 📂 Your Projects")
     
     projects = get_all_projects()
     
     if not projects:
-        st.info('No projects yet. Enter a GitHub URL above to get started.')
+        st.markdown("""
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; 
+                    padding: 40px; text-align: center; margin-top: 20px;">
+            <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;">📭</div>
+            <h3 style="color: #64748b; margin: 0; font-weight: 500;">No projects yet</h3>
+            <p style="color: #94a3b8; margin: 8px 0 0 0;">Enter a GitHub URL above to get started</p>
+        </div>
+        """, unsafe_allow_html=True)
     else:
         # Display projects in a grid
         for i in range(0, len(projects), 2):
@@ -145,32 +196,42 @@ def render(navigate_to):
                     with col:
                         render_project_card(projects[i + j], navigate_to)
     
-    # Auto-refresh for pending projects
+    # Auto-refresh for pending projects (silent refresh - no message)
     if any(p.status in ['pending', 'scanning', 'generating'] for p in projects):
-        st.info('🔄 Projects are being processed... (Auto-refreshing every 5 seconds)')
         import time
         time.sleep(5)
         st.rerun()
 
 def render_project_card(project: Project, navigate_to):
-    """Render a project card"""
+    """Render a clean project card"""
     
-    # Status badge
-    status_colors = {
-        'pending': '🟡',
-        'scanning': '🔵',
-        'generating': '🟣',
-        'ready': '🟢',
-        'error': '🔴'
+    # Status styling
+    status_config = {
+        'pending': {'icon': '⏳', 'color': '#f59e0b', 'bg': '#fef3c7', 'text': 'Pending'},
+        'scanning': {'icon': '🔍', 'color': '#3b82f6', 'bg': '#dbeafe', 'text': 'Scanning'},
+        'generating': {'icon': '⚡', 'color': '#8b5cf6', 'bg': '#e9d5ff', 'text': 'Generating'},
+        'ready': {'icon': '✅', 'color': '#10b981', 'bg': '#d1fae5', 'text': 'Ready'},
+        'error': {'icon': '❌', 'color': '#ef4444', 'bg': '#fee2e2', 'text': 'Error'}
     }
-    status_icon = status_colors.get(project.status, '⚪')
+    
+    status = status_config.get(project.status, status_config['pending'])
     
     with st.container():
         st.markdown(f"""
-        <div style="border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-            <h4>{project.repo_name}</h4>
-            <p><strong>Status:</strong> {status_icon} {project.status.upper()}</p>
-            <p><strong>Created:</strong> {project.created_at[:10]}</p>
+        <div style="background: white; border: 1px solid #cbd5e1; border-radius: 12px; 
+                    padding: 20px; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px;">
+                <h3 style="color: #0f172a; margin: 0; font-size: 16px; font-weight: 600;">
+                    📦 {project.repo_name}
+                </h3>
+                <div style="background: {status['bg']}; padding: 4px 12px; border-radius: 6px;
+                           font-weight: 500; font-size: 12px; color: {status['color']}; white-space: nowrap;">
+                    {status['icon']} {status['text']}
+                </div>
+            </div>
+            <p style="color: #64748b; margin: 0; font-size: 13px;">
+                📅 {project.created_at[:10]}
+            </p>
         </div>
         """, unsafe_allow_html=True)
         

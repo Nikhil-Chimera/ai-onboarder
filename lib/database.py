@@ -52,6 +52,8 @@ def init_db():
             content TEXT NOT NULL,
             diagram_url TEXT,
             created_at TEXT NOT NULL,
+            status TEXT DEFAULT 'pending',
+            error_message TEXT,
             FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
         )
     ''')
@@ -182,8 +184,8 @@ def create_document(document: Document) -> Document:
     cursor = conn.cursor()
     
     cursor.execute('''
-        INSERT INTO documents (id, project_id, type, title, content, diagram_url, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO documents (id, project_id, type, title, content, diagram_url, created_at, status, error_message)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         document.id,
         document.project_id,
@@ -191,7 +193,9 @@ def create_document(document: Document) -> Document:
         document.title,
         document.content,
         document.diagram_url,
-        document.created_at
+        document.created_at,
+        document.status,
+        document.error_message
     ))
     
     conn.commit()
@@ -238,6 +242,45 @@ def get_document_by_project_and_type(project_id: str, doc_type: DocType) -> Opti
     if row:
         return Document(**dict(row))
     return None
+
+def update_document_status(document_id: str, status: str, content: str = None, error_message: str = None):
+    """Update document status and optionally content"""
+    log.info(f'Updating document {document_id} status to: {status}')
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    if content:
+        cursor.execute('''
+            UPDATE documents 
+            SET status = ?, content = ?, error_message = ?
+            WHERE id = ?
+        ''', (status, content, error_message, document_id))
+    else:
+        cursor.execute('''
+            UPDATE documents 
+            SET status = ?, error_message = ?
+            WHERE id = ?
+        ''', (status, error_message, document_id))
+    
+    conn.commit()
+    conn.close()
+
+def delete_document_by_type(project_id: str, doc_type: str):
+    """Delete existing document of a specific type for a project"""
+    log.info(f'Deleting existing {doc_type} document for project {project_id}')
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        DELETE FROM documents 
+        WHERE project_id = ? AND type = ?
+    ''', (project_id, doc_type))
+    
+    conn.commit()
+    conn.close()
+    log.info(f'Deleted {cursor.rowcount} document(s)')
 
 # ============================================================================
 # VIDEO OPERATIONS

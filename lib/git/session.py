@@ -31,11 +31,40 @@ def _get_session_key(github_url: str, project_id: str) -> str:
     url_hash = hashlib.md5(github_url.encode()).hexdigest()[:8]
     return f"{url_hash}_{project_id}"
 
+def get_existing_session(project_id: str, github_url: str) -> Optional[Session]:
+    """
+    Check if a valid session exists WITHOUT creating a new one
+    
+    Returns:
+        Session if valid session exists, None otherwise
+    """
+    session_key = _get_session_key(github_url, project_id)
+    
+    if session_key in _sessions:
+        session = _sessions[session_key]
+        
+        # Validate session is still valid and repo path exists
+        if time.time() - session.created_at < SESSION_TIMEOUT:
+            if os.path.exists(session.repo_path):
+                session.last_accessed = time.time()
+                log.info(f'✅ Found valid session (repo at {session.repo_path})')
+                return session
+            else:
+                log.warning(f'⚠️ Session repo path no longer exists: {session.repo_path}')
+                del _sessions[session_key]
+        else:
+            log.info(f'Session expired')
+            cleanup_session(session_key)
+    
+    return None
+
 def get_or_create_session(project_id: str, github_url: str, session_id: Optional[str] = None) -> Session:
     """
     Get an existing session or create a new one
     
-    Reuses cloned repositories to avoid repeated cloning
+    Reuses cloned repositories to avoid repeated cloning during active sessions
+    Sessions last 1 hour, after which repos are cleaned up
+    If repo is unavailable, documents will use PROJECT.md context only
     CRITICAL: Sessions are keyed by github_url to prevent different repos from sharing sessions
     """
     import uuid

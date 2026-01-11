@@ -45,8 +45,9 @@ def generate_audio(text: str, output_path: str, lang: str = 'en') -> dict:
         if output_dir:
             os.makedirs(output_dir, exist_ok=True)
         
-        # Generate speech
-        tts = gTTS(text=text, lang=lang, slow=False)
+        # Generate speech with better voice quality
+        # Using tld='com.au' for clearer, more natural Australian English voice
+        tts = gTTS(text=text, lang=lang, slow=False, tld='com.au')
         tts.save(output_path)
         log.info(f'Audio saved to: {output_path}')
         

@@ -261,7 +261,22 @@ Include code references for technical issues.
 - Find error handling code throughout system
 - Identify validation and error messages
 - Trace error conditions
-- Use unlimited tool calls for thorough coverage"""
+- Use unlimited tool calls for thorough coverage""",
+
+    'custom': f"""You are an expert technical writer who can create any type of documentation.
+
+{BASE_EXPLORATION_GUIDE}
+
+## Documentation Task
+Create comprehensive custom documentation based on the user's request.
+Adapt your writing style, depth, and focus to match what was requested.
+
+## Rules
+- Explore the codebase thoroughly - unlimited tool calls!
+- Cite file paths and line numbers
+- Provide concrete examples from the code
+- Make it actionable and clear
+- Focus on what the user specifically requested"""
 }
 
 class DocAgent(BaseAgent):
@@ -274,9 +289,46 @@ class DocAgent(BaseAgent):
         self.doc_type = doc_type
         super().__init__(DOC_AGENT_PROMPTS[doc_type], repo_tools)
     
-    def generate_doc(self, project_md: str, custom_title: str = None) -> str:
-        """Generate documentation"""
+    def generate_doc(self, project_md: str, custom_title: str = None, context_only: bool = False) -> str:
+        """
+        Generate documentation
         
+        Args:
+            project_md: PROJECT.md content as context
+            custom_title: Custom title for custom doc type
+            context_only: If True, generate from PROJECT.md only (no repo access)
+        """
+        
+        if context_only:
+            # Generate from PROJECT.md context only (repo not available)
+            if self.doc_type == 'custom':
+                doc_title = custom_title
+            else:
+                doc_title = self.doc_type.replace('_', ' ').title()
+            
+            prompt = f"""Generate comprehensive {doc_title} documentation based on this PROJECT.md analysis.
+
+IMPORTANT: The repository is not available for exploration. Generate documentation based ONLY on the PROJECT.md content provided below.
+
+PROJECT.md CONTENT:
+{project_md}
+
+CRITICAL INSTRUCTIONS:
+- DO NOT explain what you will do or how you will do it
+- DO NOT write meta-commentary like "I will now begin to..."
+- START DIRECTLY with the documentation content
+- Base your documentation ONLY on the PROJECT.md content above
+- DO NOT attempt to use tools (repo not available)
+- Output ONLY the final markdown documentation
+- Make educated inferences from the PROJECT.md content
+
+YOUR OUTPUT MUST START WITH: # {doc_title}
+
+Then immediately provide the actual documentation content with sections and detailed explanations based on PROJECT.md."""
+            
+            return self.generate(prompt, max_iterations=100)  # Fewer iterations since no tools
+        
+        # Normal mode with repo access
         if self.doc_type == 'custom':
             prompt = f"""Generate comprehensive documentation about "{custom_title}" for this codebase.
 
@@ -284,16 +336,16 @@ Here is the PROJECT.md summary for context:
 
 {project_md}
 
-YOUR MISSION: Create exhaustive documentation about "{custom_title}".
+CRITICAL INSTRUCTIONS:
+- DO NOT explain what you will do or how you will do it
+- DO NOT write meta-commentary like "I will now begin to..."
+- START DIRECTLY with the documentation content
+- Use tools to explore the codebase
+- Output ONLY the final markdown documentation
 
-EXPLORATION REQUIREMENTS:
-1. Use listTree to explore relevant directories
-2. Use grep to find ALL relevant code patterns
-3. Read relevant files completely
-4. Cross-reference findings across multiple files
-5. Use all your tool calls
+YOUR OUTPUT MUST START WITH: # {custom_title}
 
-The goal is to create documentation so thorough that someone could fully understand "{custom_title}" without reading any code."""
+Then immediately provide the actual documentation content."""
         else:
             doc_title = self.doc_type.replace('_', ' ').title()
             prompt = f"""Generate comprehensive {doc_title} documentation for this codebase.
@@ -302,16 +354,16 @@ Here is the PROJECT.md summary for context:
 
 {project_md}
 
-YOUR MISSION: Create exhaustive {doc_title} documentation.
+CRITICAL INSTRUCTIONS:
+- DO NOT explain what you will do or how you will do it
+- DO NOT write meta-commentary like "I will now begin to..."
+- START DIRECTLY with the documentation content
+- Use tools to explore the codebase thoroughly
+- Output ONLY the final markdown documentation
 
-EXPLORATION REQUIREMENTS:
-1. Use listTree to see the structure
-2. Use grep to find relevant code patterns
-3. Read relevant files COMPLETELY
-4. Cross-reference findings across multiple files
-5. Use all your tool calls
+YOUR OUTPUT MUST START WITH: # {doc_title}
 
-The goal is to create documentation so thorough that someone could fully understand the {doc_title} without reading any code."""
+Then immediately provide the actual documentation content with sections, examples, and code references."""
 
         return self.generate(prompt, max_iterations=500)
 

@@ -97,6 +97,73 @@ def create_slide_video(image_path: str, audio_path: str, output_path: str, audio
         traceback.print_exc()
         raise
 
+def create_video_from_frames(
+    frames_pattern: str,
+    audio_path: str,
+    output_path: str,
+    fps: int = 24,
+    audio_duration: float = None
+):
+    """
+    Create video from image frames with audio
+    
+    Args:
+        frames_pattern: Pattern for frame images (e.g., 'slide_0_frame_%04d.png')
+        audio_path: Path to audio file
+        output_path: Path for output video
+        fps: Frames per second
+        audio_duration: Duration of audio (if None, uses audio file duration)
+    """
+    log.info(f'Creating video from frames at {fps} fps')
+    
+    try:
+        ensure_dir(os.path.dirname(output_path))
+        
+        # FFmpeg command to create video from image sequence + audio
+        command = [
+            FFMPEG_EXE,
+            '-framerate', str(fps),
+            '-i', frames_pattern,
+            '-i', audio_path,
+            '-c:v', 'libx264',
+            '-preset', 'medium',
+            '-crf', '23',
+            '-c:a', 'aac',
+            '-b:a', '192k',
+            '-pix_fmt', 'yuv420p',
+            '-shortest'
+        ]
+        
+        if audio_duration:
+            command.extend(['-t', str(audio_duration)])
+        
+        command.extend(['-y', output_path])
+        
+        log.info(f'Running FFmpeg with frame sequence...')
+        
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+        
+        if result.returncode != 0:
+            log.error(f'FFmpeg error: {result.stderr}')
+            raise RuntimeError(f'FFmpeg failed: {result.stderr}')
+        
+        if not os.path.exists(output_path):
+            raise FileNotFoundError(f'Output video not created: {output_path}')
+        
+        log.info(f'✅ Animated video created: {output_path}')
+        
+    except subprocess.TimeoutExpired:
+        log.error('FFmpeg timeout')
+        raise RuntimeError('Video creation timed out')
+    except Exception as e:
+        log.error(f'Animated video creation failed: {e}')
+        raise
+
 def concatenate_videos(video_paths: List[str], output_path: str):
     """
     Concatenate multiple videos into one
