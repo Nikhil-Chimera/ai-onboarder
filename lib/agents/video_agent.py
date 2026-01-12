@@ -15,12 +15,9 @@ load_dotenv()
 
 log = create_logger('VIDEO')
 
-# Initialize client
+# Initialize client (note: module-level client is kept for backward compatibility,
+# but each call creates a fresh API request so no conversation state is shared)
 api_key = os.getenv('GOOGLE_API_KEY')
-if api_key:
-    client = genai.Client(api_key=api_key)
-else:
-    client = None
 
 VIDEO_SYSTEM_PROMPT = """You are an expert video content creator. Your job is to transform documentation into concise 4-5 slide video storyboards for employee training.
 
@@ -92,8 +89,11 @@ Create a compelling 4-5 slide video that will help employees understand this top
 Output the storyboard as valid JSON following the format specified in your instructions."""
 
     try:
-        if not client:
+        if not api_key:
             raise ValueError('Gemini client not initialized - check GOOGLE_API_KEY')
+        
+        # Create a fresh client for this request to ensure isolation
+        client = genai.Client(api_key=api_key)
         
         # Use Gemini 2.0 Flash for better storyboard generation
         config = types.GenerateContentConfig(

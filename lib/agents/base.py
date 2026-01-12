@@ -19,9 +19,6 @@ log = create_logger('AGENT')
 api_key = os.getenv('GOOGLE_API_KEY')
 if not api_key:
     log.warning('GOOGLE_API_KEY not found in environment')
-    client = None
-else:
-    client = genai.Client(api_key=api_key)
 
 # Use Gemini 2.0 Flash Experimental - latest stable model
 # Fast, powerful, 1M context window
@@ -33,18 +30,24 @@ class BaseAgent:
     def __init__(self, system_prompt: str, repo_tools: Optional[RepoTools] = None):
         self.system_prompt = system_prompt
         self.repo_tools = repo_tools
-        self.client = client
         
-        if not self.client:
+        # Create a dedicated client per agent instance to avoid cross-contamination
+        # This ensures each agent's conversations are isolated
+        if not api_key:
             raise ValueError('Gemini client not initialized - check GOOGLE_API_KEY')
+        self.client = genai.Client(api_key=api_key)
         
         # Define tools for Gemini
         self.tools = self._define_tools() if repo_tools else []
         
+        # Generate a unique session ID for this agent instance
+        import uuid
+        self.session_id = str(uuid.uuid4())[:8]
+        
         # Log repository info for debugging
         if repo_tools:
-            log.info(f'Agent initialized with repository: {repo_tools.repo_path}')
-            log.info(f'Tools available: {[t["function_declarations"][0]["name"] for t in self.tools] if self.tools else "none"}')
+            log.info(f'[{self.session_id}] Agent initialized with repository: {repo_tools.repo_path}')
+            log.info(f'[{self.session_id}] Tools available: {[t["function_declarations"][0]["name"] for t in self.tools] if self.tools else "none"}')
             import os
             if os.path.exists(repo_tools.repo_path):
                 try:
@@ -129,8 +132,11 @@ class BaseAgent:
         Returns:
             Generated text response
         """
-        log.info(f'Generating response (max iterations: {max_iterations})')
-        log.info(f'Tools registered: {len(self.tools)} tool sets')
+        session_id = getattr(self, 'session_id', 'unknown')
+        log.info(f'[{session_id}] Generating response (max iterations: {max_iterations})')
+        log.info(f'[{session_id}] Tools registered: {len(self.tools)} tool sets')
+        if self.repo_tools:
+            log.info(f'[{session_id}] Repository: {self.repo_tools.repo_path}')
         
         try:
             # Build config with tools
@@ -149,7 +155,7 @@ class BaseAgent:
             iteration = 0
             while iteration < max_iterations:
                 # Generate response
-                log.info(f'Iteration {iteration + 1}/{max_iterations}')
+                log.info(f'[{session_id}] Iteration {iteration + 1}/{max_iterations}')
                 response = self.client.models.generate_content(
                     model=MODEL_NAME,
                     contents=messages,
@@ -158,7 +164,7 @@ class BaseAgent:
                 
                 # Check if response has text (final answer)
                 if hasattr(response, 'text') and response.text:
-                    log.info(f'✅ Response generated after {iteration} tool calls')
+                    log.info(f'[{session_id}] ✅ Response generated after {iteration} tool calls')
                     return response.text
                 
                 # Check for function calls
@@ -168,11 +174,11 @@ class BaseAgent:
                     
                     # Check if content is None (blocked by safety filters)
                     if not hasattr(candidate, 'content') or candidate.content is None:
-                        log.error('❌ API response blocked (content is None) - likely safety filter or rate limit')
+                        log.error(f'[{session_id}] ❌ API response blocked (content is None) - likely safety filter or rate limit')
                         if hasattr(candidate, 'finish_reason'):
-                            log.error(f'   Finish reason: {candidate.finish_reason}')
+                            log.error(f'[{session_id}]    Finish reason: {candidate.finish_reason}')
                         if hasattr(candidate, 'safety_ratings'):
-                            log.error(f'   Safety ratings: {candidate.safety_ratings}')
+                            log.error(f'[{session_id}]    Safety ratings: {candidate.safety_ratings}')
                         raise ValueError('API response was blocked. This may be due to safety filters or rate limiting.')
                     
                     if hasattr(candidate.content, 'parts') and candidate.content.parts:
@@ -183,12 +189,14 @@ class BaseAgent:
                                 tool_name = func_call.name
                                 tool_args = dict(func_call.args) if hasattr(func_call, 'args') else {}
                                 
-                                log.info(f'🔧 Tool call [{iteration + 1}]: {tool_name}({tool_args})')
+                                log.info(f'[{session_id}] 🔧 Tool call [{iteration + 1}]: {tool_name}({tool_args})')
+                                if self.repo_tools:
+                                    log.info(f'[{session_id}]    Repository: {self.repo_tools.repo_path}')
                                 
                                 # Execute tool
                                 if self.repo_tools:
                                     result = self._execute_tool(tool_name, tool_args)
-                                    log.info(f'   Result: {str(result)[:200]}...')
+                                    log.info(f'[{session_id}]    Result: {str(result)[:200]}...')
                                     
                                     # Add assistant's function call to history
                                     messages.append(candidate.content)
@@ -207,7 +215,7 @@ class BaseAgent:
                                     iteration += 1
                                     break  # Process one function call at a time
                                 else:
-                                    log.error('Tool execution requested but no repo_tools available')
+                                    log.error(f'[{session_id}] Tool execution requested but no repo_tools available')
                                     break
                         
                         if has_function_call:
@@ -215,26 +223,27 @@ class BaseAgent:
                 
                 # No function calls and no text - something went wrong
                 if not has_function_call:
-                    log.warning(f'⚠️  No function calls and no text at iteration {iteration}')
+                    log.warning(f'[{session_id}] ⚠️  No function calls and no text at iteration {iteration}')
                     # Try to get partial text
                     if hasattr(response, 'candidates') and response.candidates:
                         candidate = response.candidates[0]
                         if hasattr(candidate, 'content') and candidate.content is not None and hasattr(candidate.content, 'parts'):
                             for part in candidate.content.parts:
                                 if hasattr(part, 'text') and part.text:
-                                    log.info(f'Found partial text: {part.text[:200]}')
+                                    log.info(f'[{session_id}] Found partial text: {part.text[:200]}')
                                     return part.text
                     break
             
             # If we exhausted iterations
-            log.warning(f'⚠️  Reached max iterations ({max_iterations})')
+            log.warning(f'[{session_id}] ⚠️  Reached max iterations ({max_iterations})')
             if hasattr(response, 'text') and response.text:
                 return response.text
             else:
                 return f'Analysis incomplete after {max_iterations} iterations. Please try again with a simpler request.'
                 
         except Exception as e:
-            log.error(f'❌ Generation failed: {e}')
+            session_id = getattr(self, 'session_id', 'unknown')
+            log.error(f'[{session_id}] ❌ Generation failed: {e}')
             import traceback
             traceback.print_exc()
             raise
