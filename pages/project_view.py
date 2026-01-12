@@ -78,12 +78,11 @@ def generate_document_async(document_id: str, project_id: str, doc_type: str, ti
         else:
             # Full mode with repo exploration
             log.info(f'🔄 Generating with full repository access: {repo_path}')
+            from lib.agents.doc_agents import DocAgent
             repo_tools = create_repo_tools(repo_path)
-            doc_agents = create_doc_agents(repo_tools)
             
-            agent = doc_agents.get(doc_type)
-            if not agent:
-                raise ValueError(f'Unknown document type: {doc_type}')
+            # Create only the specific agent needed (not all 12 types)
+            agent = DocAgent(doc_type, repo_tools)
             
             content = agent.generate_doc(project_md, title, context_only=False)
         
