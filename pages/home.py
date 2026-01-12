@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 import threading
 
-from lib.database import create_project, get_all_projects, update_project, update_project_status
+from lib.database import create_project, get_all_projects, update_project, update_project_status, get_connection
 from lib.types import Project
 from lib.git import clone_repository, parse_github_url, get_or_create_session
 from lib.tools import create_repo_tools
@@ -15,6 +15,26 @@ from lib.agents import MapperAgent
 from lib.logger import create_logger
 
 log = create_logger('HOME')
+
+def delete_all_data():
+    """Delete all data from the database"""
+    log.info('Deleting all data from database')
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Delete in order due to foreign key constraints
+        cursor.execute('DELETE FROM videos')
+        cursor.execute('DELETE FROM documents')
+        cursor.execute('DELETE FROM projects')
+        conn.commit()
+        log.info('All data deleted successfully')
+    except Exception as e:
+        conn.rollback()
+        log.error(f'Failed to delete data: {e}')
+        raise
+    finally:
+        conn.close()
 
 def process_repository_async(project_id: str, github_url: str):
     """Process repository in background"""
@@ -71,6 +91,31 @@ def process_repository_async(project_id: str, github_url: str):
 
 def render(navigate_to):
     """Render home page with clean UI"""
+    
+    # Custom CSS for delete button with red background and square borders
+    st.markdown("""
+    <style>
+    /* Target delete buttons by their key pattern */
+    button[data-testid="baseButton-secondary"] {
+        background-color: #ef4444 !important;
+        color: white !important;
+        border: 2px solid #ef4444 !important;
+        border-radius: 4px !important;
+        font-size: 20px !important;
+        padding: 6px 0px !important;
+        min-height: 40px !important;
+    }
+    button[data-testid="baseButton-secondary"]:hover {
+        background-color: #dc2626 !important;
+        border-color: #dc2626 !important;
+        transform: scale(1.02);
+    }
+    button[data-testid="baseButton-secondary"]:active {
+        background-color: #b91c1c !important;
+        border-color: #b91c1c !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
     # Hero Section
     st.markdown("""
@@ -173,7 +218,32 @@ def render(navigate_to):
     
     # Projects list
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("### 📂 Your Projects")
+    
+    # Projects header with delete button
+    col1, col2 = st.columns([6, 1])
+    with col1:
+        st.markdown("### 📂 Your Projects")
+    with col2:
+        if st.button('🗑️', key='delete_all_db', 
+                    help='Delete all database data',
+                    use_container_width=True):
+            st.session_state['confirm_delete_all'] = True
+            st.rerun()
+    
+    # Confirmation dialog for deletion
+    if st.session_state.get('confirm_delete_all', False):
+        st.warning('⚠️ This will delete ALL projects and data from the database!')
+        col1, col2, col3 = st.columns([2, 2, 2])
+        with col1:
+            if st.button('✅ Confirm Delete', key='confirm_delete_yes', type='primary'):
+                delete_all_data()
+                st.session_state['confirm_delete_all'] = False
+                st.success('Database cleared!')
+                st.rerun()
+        with col2:
+            if st.button('❌ Cancel', key='confirm_delete_no'):
+                st.session_state['confirm_delete_all'] = False
+                st.rerun()
     
     projects = get_all_projects()
     
@@ -224,9 +294,11 @@ def render_project_card(project: Project, navigate_to):
                 <h3 style="color: #0f172a; margin: 0; font-size: 16px; font-weight: 600;">
                     📦 {project.repo_name}
                 </h3>
-                <div style="background: {status['bg']}; padding: 4px 12px; border-radius: 6px;
-                           font-weight: 500; font-size: 12px; color: {status['color']}; white-space: nowrap;">
-                    {status['icon']} {status['text']}
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <div style="background: {status['bg']}; padding: 4px 12px; border-radius: 6px;
+                               font-weight: 500; font-size: 12px; color: {status['color']}; white-space: nowrap;">
+                        {status['icon']} {status['text']}
+                    </div>
                 </div>
             </div>
             <p style="color: #64748b; margin: 0; font-size: 13px;">
@@ -235,6 +307,7 @@ def render_project_card(project: Project, navigate_to):
         </div>
         """, unsafe_allow_html=True)
         
+        # Action buttons
         if project.status == 'ready':
             if st.button(f'View Project', key=f'view_{project.id}', use_container_width=True):
                 navigate_to('project', project.id)
