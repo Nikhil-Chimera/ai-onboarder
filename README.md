@@ -1025,9 +1025,3 @@ Future enhancements planned:
 - **MoviePy** - Video generation library
 - **FFmpeg** - Media processing
 - **Open Source Community** - Inspiration and tools
-
----
-
-## 📞 Contact & Support
-
-- **Email:** l.nikhil.codes@gmail.com
